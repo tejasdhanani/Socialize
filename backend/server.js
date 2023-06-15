@@ -8,6 +8,8 @@ connectDB();
 
 const app = express();
 
+app.use("/api/users", require("./routes/userRoutes"));
+
 app.use(errorHandler);
 
 app.listen(port, () => console.log(`server stared ${port}`));
