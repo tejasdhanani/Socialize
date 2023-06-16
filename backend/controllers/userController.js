@@ -3,36 +3,38 @@ const bcrypt = require("bcryptjs");
 const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
 
+//
 // @desc       Register new User
 // @route      POST  /api/users
 // @access     Public
 const registerUser = asyncHandler(async (req, res) => {
+  // Get user data from the request
   const { name, email, password } = req.body;
 
+  // If all the required fields are not passed
   if (!name || !email || !password) {
     res.status(400);
     throw new Error("Please add all fields");
   }
 
-  // check if user exists
-  const userExists = await User.findOne({ email });
-
-  if (userExists) {
+  // If user already exists in the database
+  if (await User.findOne({ email })) {
     res.status(400);
     throw new Error("User Already Exists!");
   }
 
-  // hash password
+  // If user does not user exists, hash password
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  // create a user
+  // Create a user in the database
   const user = await User.create({
     name,
     email,
     password: hashedPassword,
   });
 
+  // If the user has been successfully created then send response to the request
   if (user) {
     res.status(201).json({
       _id: user.id,
@@ -40,30 +42,32 @@ const registerUser = asyncHandler(async (req, res) => {
       email: user.email,
       token: generateToken(user._id),
     });
-  } else {
+  }
+  // If the user has not been created then throw an error
+  else {
     res.status(400);
     throw new Error("Could not register the user");
   }
-
-  res.json({
-    message: "Register user",
-  });
 });
 
-// @desc       Authenticate new User
+//
+// @desc       Login User
 // @route      POST  /api/users/login
 // @access     Public
 const loginUser = asyncHandler(async (req, res) => {
+  // Get user data from the request
   const { email, password } = req.body;
 
+  // If all the required fields are not passed
   if (!email || !password) {
     res.status(400);
     throw new Error("Please add all fields");
   }
 
-  // check for user email
+  // Finding user in the database
   const user = await User.findOne({ email });
 
+  // If the user is in the database and both the passwords match
   if (user && (await bcrypt.compare(password, user.password))) {
     res.json({
       _id: user.id,
@@ -71,22 +75,23 @@ const loginUser = asyncHandler(async (req, res) => {
       email: user.email,
       token: generateToken(user._id),
     });
-  } else {
+  }
+  // Else the user is not in the database or passwords do not match
+  else {
     res.status(400);
     throw new Error("Invalid Credentials!");
   }
-
-  res.json({
-    message: "Login user",
-  });
 });
 
+//
 // @desc       Get User Data
 // @route      GET  /api/users/me
 // @access     Private
 const getMe = asyncHandler(async (req, res) => {
+  // Get the user from the database by req.user.id params which comes from the token authMiddleware
   const { _id, name, email } = await User.findById(req.user.id);
 
+  // Send the current user data as a response
   res.status(200).json({
     id: _id,
     name,
@@ -94,13 +99,18 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
+//
 // @desc       Change user password
 // @route      POST  /api/users/changepassword
 // @access     Private
 const changePassword = asyncHandler(async (req, res) => {
+  // Get the userId from the token in authMiddleware
   const userId = req.user.id;
+
+  // Get the passwords from request body
   const { currentPassword, newPassword } = req.body;
 
+  // If all the required fields are not passed
   if (!currentPassword || !newPassword) {
     res.status(400);
     throw new Error("Current password and new password are required feilds.");
@@ -109,19 +119,19 @@ const changePassword = asyncHandler(async (req, res) => {
   // Retrieve the user from the database
   const user = await User.findById(userId);
 
+  // Authenticate the user by checking if the currentPassword is=to thier stored password
   if (await bcrypt.compare(currentPassword, user.password)) {
-    // Hash password
+    // Hash password the new password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
+    // Update the new hashedPassword
     await User.updateOne(
       { _id: userId },
       {
         password: hashedPassword,
       }
     );
-
-    console.log("ssdfj");
 
     res.status(201).json("Password changed successfully!");
   } else {
@@ -130,7 +140,7 @@ const changePassword = asyncHandler(async (req, res) => {
   }
 });
 
-// Generate JWT
+// Generate JsonWebToken which expires in 30days
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "30d",
