@@ -56,10 +56,15 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    res.status(400);
+    throw new Error("Please add all fields");
+  }
+
   // check for user email
   const user = await User.findOne({ email });
 
-  if (user && bcrypt.compare(password, user.password)) {
+  if (user && (await bcrypt.compare(password, user.password))) {
     res.json({
       _id: user.id,
       name: user.name,
@@ -68,7 +73,7 @@ const loginUser = asyncHandler(async (req, res) => {
     });
   } else {
     res.status(400);
-    throw new Error("Could not login the user");
+    throw new Error("Invalid Credentials!");
   }
 
   res.json({
@@ -89,6 +94,42 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc       Change user password
+// @route      POST  /api/users/changepassword
+// @access     Private
+const changePassword = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400);
+    throw new Error("Current password and new password are required feilds.");
+  }
+
+  // Retrieve the user from the database
+  const user = await User.findById(userId);
+
+  if (await bcrypt.compare(currentPassword, user.password)) {
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await User.updateOne(
+      { _id: userId },
+      {
+        password: hashedPassword,
+      }
+    );
+
+    console.log("ssdfj");
+
+    res.status(201).json("Password changed successfully!");
+  } else {
+    res.status(400);
+    throw new Error("Invalid current password");
+  }
+});
+
 // Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -100,4 +141,5 @@ module.exports = {
   registerUser,
   loginUser,
   getMe,
+  changePassword,
 };
