@@ -67,8 +67,15 @@ const loginUser = asyncHandler(async (req, res) => {
   // Finding user in the database
   const user = await User.findOne({ email });
 
-  // If the user is in the database and both the passwords match
-  if (user && (await bcrypt.compare(password, user.password))) {
+  // If the user is not found in the database
+  if (!user) {
+    res.status(400);
+    throw new Error("User does not exists!");
+  }
+  // Else user must exists in the database
+
+  // If user supplied correct password
+  if (await bcrypt.compare(password, user.password)) {
     res.json({
       _id: user.id,
       name: user.name,
@@ -79,7 +86,7 @@ const loginUser = asyncHandler(async (req, res) => {
   // Else the user is not in the database or passwords do not match
   else {
     res.status(400);
-    throw new Error("Invalid Credentials!");
+    throw new Error("Incorrect password supplied!");
   }
 });
 
@@ -133,11 +140,32 @@ const changePassword = asyncHandler(async (req, res) => {
       }
     );
 
-    res.status(201).json("Password changed successfully!");
+    res.status(201).json({
+      message: "Password changed successfully.",
+    });
   } else {
     res.status(400);
-    throw new Error("Invalid current password");
+    throw new Error("Invalid current password!");
   }
+});
+
+//
+// @desc       Delete User
+// @route      DELETE  /api/users/
+// @access     Private
+const deleteUser = asyncHandler(async (req, res) => {
+  // If the user does not exists
+  if (!req.user) {
+    res.status(400);
+    throw new Error("User does not exists!");
+  }
+
+  // Delete the user from the database
+  await User.findByIdAndDelete(req.user.id);
+
+  res.status(200).json({
+    message: `User ${req.user.email} account deleted successfully.`,
+  });
 });
 
 // Generate JsonWebToken which expires in 30days
@@ -152,4 +180,5 @@ module.exports = {
   loginUser,
   getMe,
   changePassword,
+  deleteUser,
 };
